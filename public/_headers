@@ -1,0 +1,9 @@
+/*
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Cross-Origin-Embedder-Policy: unsafe-none
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+
+# Allow Firebase auth popup to communicate
+/__/auth/*
+  Cross-Origin-Opener-Policy: unsafe-none

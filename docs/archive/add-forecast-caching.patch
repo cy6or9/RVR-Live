@@ -1,0 +1,15 @@
+--- a/src/pages/river-conditions.js
++++ b/src/pages/river-conditions.js
+@@ -1177,6 +1177,13 @@
+   const predictionSeries = normalizeForecastSeries(data, 7);
+ 
++  // Update cached forecast when prediction data changes
++  useEffect(() => {
++    if (updateCachedForecast && predictionSeries && predictionSeries.length > 0) {
++      updateCachedForecast(predictionSeries);
++    }
++  }, [predictionSeries, updateCachedForecast]);
++
+   // "Official NOAA Forecast" badge when NWPS is used
+   const forecastSource = String(data?.forecastSource ?? data?.forecast_source ?? "").toLowerCase();
+   const forecastType = String(data?.forecastType ?? data?.forecast_type ?? "").toLowerCase();
