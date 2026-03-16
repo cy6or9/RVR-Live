@@ -30,6 +30,10 @@ const isData = (url) =>
   (url.origin === self.location.origin && url.pathname.startsWith('/api/')) ||
   /noaa\.gov|weather\.gov|water\.noaa\.gov|hydrograph|forecast/.test(url.hostname + url.pathname);
 
+const isNextAsset = (url) =>
+  url.origin === self.location.origin &&
+  (url.pathname.startsWith('/_next/') || url.pathname.includes('webpack-hmr'));
+
 async function cacheFirst(req, cacheName, maxEntries) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(req);
@@ -72,6 +76,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+
+  // Never cache Next.js runtime assets or HMR endpoints.
+  // Caching these can serve stale chunks after restart/deploy.
+  if (isNextAsset(url)) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (isTile(url)) {
     event.respondWith(cacheFirst(request, TILE_CACHE, MAX_TILE_ENTRIES));

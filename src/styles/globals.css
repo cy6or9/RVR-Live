@@ -1,0 +1,233 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* shadcn/ui theme tokens restored */
+@layer base {
+  :root {
+    --border: 214.3 31.8% 91.4%;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+  }
+}
+
+/* LIGHT MODE */
+:root {
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .05);
+  --opaque-button-border-intensity: -8;
+
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .08);
+
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --border: 0 0% 89%;
+  --card: 0 0% 98%;
+  --card-foreground: 0 0% 9%;
+  --card-border: 0 0% 92%;
+  --sidebar: 0 0% 96%;
+  --sidebar-foreground: 0 0% 9%;
+  --sidebar-border: 0 0% 90%;
+  --sidebar-primary: 211 85% 28%;
+  --sidebar-primary-foreground: 210 20% 98%;
+  --sidebar-accent: 210 8% 92%;
+  --sidebar-accent-foreground: 0 0% 9%;
+  --sidebar-ring: 211 85% 28%;
+  --popover: 0 0% 94%;
+  --popover-foreground: 0 0% 9%;
+  --popover-border: 0 0% 88%;
+  --primary: 211 85% 28%;
+  --primary-foreground: 210 20% 98%;
+  --secondary: 210 6% 90%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 210 8% 92%;
+  --muted-foreground: 0 0% 40%;
+  --accent: 210 10% 90%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84% 32%;
+  --destructive-foreground: 0 20% 98%;
+  --input: 0 0% 74%;
+  --ring: 211 85% 28%;
+  --chart-1: 211 85% 28%;
+  --chart-2: 142 71% 35%;
+  --chart-3: 280 65% 32%;
+  --chart-4: 32 95% 38%;
+  --chart-5: 345 82% 35%;
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: Georgia, Merriweather, serif;
+  --font-mono: Menlo, Monaco, "Courier New", monospace;
+  --radius: .5rem;
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.08);
+  --shadow-sm: 0px 2px 4px -1px hsl(0 0% 0% / 0.06), 0px 1px 2px -1px hsl(0 0% 0% / 0.08);
+  --shadow: 0px 4px 6px -1px hsl(0 0% 0% / 0.08), 0px 2px 4px -2px hsl(0 0% 0% / 0.06);
+  --shadow-md: 0px 6px 12px -2px hsl(0 0% 0% / 0.10), 0px 3px 6px -3px hsl(0 0% 0% / 0.08);
+  --shadow-lg: 0px 12px 24px -4px hsl(0 0% 0% / 0.12), 0px 6px 12px -6px hsl(0 0% 0% / 0.08);
+  --shadow-xl: 0px 20px 40px -8px hsl(0 0% 0% / 0.14), 0px 10px 20px -10px hsl(0 0% 0% / 0.10);
+  --shadow-2xl: 0px 30px 60px -12px hsl(0 0% 0% / 0.18);
+
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --secondary-border: hsl(var(--secondary));
+  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --muted-border: hsl(var(--muted));
+  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --accent-border: hsl(var(--accent));
+  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --destructive-border: hsl(var(--destructive));
+  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+}
+
+.dark {
+  --button-outline: rgba(255,255,255,.10);
+  --badge-outline: rgba(255,255,255,.05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255,.04);
+  --elevate-2: rgba(255,255,255,.09);
+  --background: 0 0% 7%;
+  --foreground: 0 0% 95%;
+  --border: 0 0% 18%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 95%;
+  --card-border: 0 0% 15%;
+  --sidebar: 0 0% 11%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-border: 0 0% 17%;
+  --sidebar-primary: 211 85% 28%;
+  --sidebar-primary-foreground: 210 20% 98%;
+  --sidebar-accent: 210 10% 14%;
+  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar-ring: 211 85% 28%;
+  --popover: 0 0% 13%;
+  --popover-foreground: 0 0% 95%;
+  --popover-border: 0 0% 19%;
+  --primary: 211 85% 28%;
+  --primary-foreground: 210 20% 98%;
+  --secondary: 210 8% 17%;
+  --secondary-foreground: 0 0% 95%;
+  --muted: 210 10% 15%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 210 12% 16%;
+  --accent-foreground: 0 0% 95%;
+  --destructive: 0 84% 32%;
+  --destructive-foreground: 0 20% 98%;
+  --input: 0 0% 32%;
+  --ring: 211 85% 28%;
+  --chart-1: 211 85% 65%;
+  --chart-2: 142 71% 68%;
+  --chart-3: 280 65% 72%;
+  --chart-4: 32 95% 70%;
+  --chart-5: 345 82% 68%;
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply font-sans antialiased bg-background text-foreground; }
+}
+
+@layer utilities {
+  input[type="search"]::-webkit-search-cancel-button { @apply hidden; }
+
+  [contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+  }
+}
+
+/* ============================================================
+   🟩 RVR MAP ENHANCEMENTS — restores previous build behavior
+   ============================================================ */
+
+/* Hover highlight on AIS icons */
+.leaflet-interactive:hover {
+  filter: brightness(1.45) saturate(1.8);
+  stroke: #00faff !important;
+  stroke-width: 2px !important;
+  transition: 160ms ease-in-out;
+}
+
+/* Pleasure / Private craft — RED */
+path[vesseltype="Pleasure"],
+path[vesseltype="Yacht"],
+path[vesseltype="Recreational"] {
+  fill: #ff4a4a !important;
+}
+
+/* Tow / Tug / Cargo — CYAN */
+path[vesseltype="Tug"],
+path[vesseltype="Tow"],
+path[vesseltype="Cargo"],
+path[vesseltype="Tanker"],
+path[vesseltype="Towing"] {
+  fill: #00eaff !important;
+}
+
+/* Passenger — YELLOW */
+path[vesseltype="Passenger"] {
+  fill: #ffe14a !important;
+}
+
+/* Remove AIS layer stroke clutter */
+.marinetraffic-vessels path {
+  stroke: transparent !important;
+}
+
+/* Map background tone (dark slate river tone) */
+.leaflet-container {
+  background: #0b1a23 !important;
+}
+
+/* Search bar polish */
+iframe + div [role="search"] input {
+  border-radius: 12px !important;
+  backdrop-filter: blur(6px);
+}
+
+/* Compass calibration figure-8 animation */
+@keyframes figure8 {
+  0% {
+    transform: translate(0, -24px) rotate(-10deg);
+    opacity: 1;
+  }
+  12.5% {
+    transform: translate(-18px, -12px) rotate(-20deg);
+    opacity: 0.95;
+  }
+  25% {
+    transform: translate(-24px, 0) rotate(-25deg);
+    opacity: 0.9;
+  }
+  37.5% {
+    transform: translate(-18px, 12px) rotate(-20deg);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(0, 24px) rotate(10deg);
+    opacity: 0.8;
+  }
+  62.5% {
+    transform: translate(18px, 12px) rotate(20deg);
+    opacity: 0.85;
+  }
+  75% {
+    transform: translate(24px, 0) rotate(25deg);
+    opacity: 0.9;
+  }
+  87.5% {
+    transform: translate(18px, -12px) rotate(20deg);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(0, -24px) rotate(-10deg);
+    opacity: 1;
+  }
+}
