@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
-import { firestore } from "@/lib/firebase";
+import { auth, firestore } from "@/lib/firebase";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,9 +41,10 @@ export default function AdminUserPrivilegesPage() {
     queryFn: async () => {
       // Get the user's ID token for server-side authorization
       let idToken = null;
-      if (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
+      const user = auth.currentUser;
+      if (user) {
         try {
-          idToken = await window.firebase.auth.currentUser.getIdToken(true);
+          idToken = await user.getIdToken();
         } catch (tokenError) {
           console.error("[Admin] Failed to get ID token:", tokenError.message);
         }
