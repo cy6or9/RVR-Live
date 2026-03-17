@@ -1,16 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { getLockActivityVisuals } from '@/lib/lockActivity';
 
 /**
  * OhioRiverActivityMap Component
  * 
- * GPS-style interactive map showing:
- * - All Ohio River locks & dams
- * - Real-time activity: tow passages, queue congestion, wait times
- * - Directional flow indicators
- * - Traffic density heatmap visualization
+ * GPS-style interactive map showing lock locations, hydrology-derived danger levels,
+ * and verified status metadata when a public source is available.
  * 
  * Data sources (all public):
  * - U.S. Army Corps of Engineers lock logs
@@ -188,6 +184,10 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
   const onLockSelectRef = useRef(onLockSelect);
   const selectedLockIdRef = useRef(selectedLockId);
   const selectedHydroRef = useRef(selectedHydro);
+  const lockActivityByIdRef = useRef(lockActivityById);
+  const currentRiverLevelRef = useRef(currentRiverLevel);
+  const riverConditionLabelRef = useRef(riverConditionLabel);
+  const weatherNowRef = useRef(weatherNow);
 
   useEffect(() => {
     onLockSelectRef.current = onLockSelect;
@@ -200,6 +200,22 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
   useEffect(() => {
     selectedHydroRef.current = selectedHydro;
   }, [selectedHydro]);
+
+  useEffect(() => {
+    lockActivityByIdRef.current = lockActivityById;
+  }, [lockActivityById]);
+
+  useEffect(() => {
+    currentRiverLevelRef.current = currentRiverLevel;
+  }, [currentRiverLevel]);
+
+  useEffect(() => {
+    riverConditionLabelRef.current = riverConditionLabel;
+  }, [riverConditionLabel]);
+
+  useEffect(() => {
+    weatherNowRef.current = weatherNow;
+  }, [weatherNow]);
   
   /**
    * Generate popup content HTML based on lock status state
@@ -207,6 +223,9 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
    * Now supports cached data display with freshness indicator
    */
   const createPopupContent = (lockName, riverMile, currentState, queueLength, congestion, waitTime, towsLast24h, direction, lastPassage, color, cached = false, ageMinutes = null, floodStages = null, hydroGuidance = null, activity = null, env = null) => {
+    const hasVerifiedTrafficMetrics = !!activity?.hasVerifiedTrafficMetrics;
+    const isHydrologyEstimate = !!activity?.derivedFromHydrology;
+    const hasCongestion = Number.isFinite(congestion);
     const units = floodStages?.units || 'ft';
     const formatStage = (value) => {
       const n = Number(value);
@@ -249,27 +268,127 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
     const envConditionText = env?.riverConditionLabel || 'N/A';
     const envWind = Number(env?.windMph);
     const envWindText = Number.isFinite(envWind) ? `${envWind.toFixed(1)} mph` : 'N/A';
+    const envWindDeg = Number(env?.windDeg);
+    const hasWindDirection = Number.isFinite(envWindDeg);
+    const windToDeg = hasWindDirection ? ((envWindDeg + 180 + 360) % 360) : null;
+    const windDirLabel = (deg) => {
+      if (!Number.isFinite(deg)) return 'N/A';
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      return dirs[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+    };
+    const envWindDirText = hasWindDirection ? `${windDirLabel(envWindDeg)} (${envWindDeg.toFixed(0)} deg)` : 'N/A';
+    const windToText = Number.isFinite(windToDeg) ? `${windDirLabel(windToDeg)} (${windToDeg.toFixed(0)} deg)` : 'N/A';
+    const envGust = Number(env?.windGustHighMph ?? env?.windGustMph);
+    const envGustText = Number.isFinite(envGust) ? `${envGust.toFixed(1)} mph` : 'N/A';
+    const envPrecip = Number(env?.precip);
+    const envPrecipText = Number.isFinite(envPrecip) ? `${Math.round(envPrecip)}%` : 'N/A';
+    const envTemp = Number(env?.tempF);
+    const envTempText = Number.isFinite(envTemp) ? `${envTemp.toFixed(1)} deg F` : 'N/A';
+    const envTempHigh = Number(env?.tempHighF);
+    const envTempLow = Number(env?.tempLowF);
+    const envTempRangeText = Number.isFinite(envTempHigh) && Number.isFinite(envTempLow)
+      ? `H ${Math.round(envTempHigh)} deg / L ${Math.round(envTempLow)} deg`
+      : 'N/A';
     const envForecastText = env?.shortForecast ? String(env.shortForecast) : 'N/A';
+    const envForecastLower = envForecastText.toLowerCase();
+    const weatherIcon = envForecastText === 'N/A'
+      ? 'N/A'
+      : (envForecastLower.includes('thunder') || envForecastLower.includes('tstorm'))
+        ? '⛈'
+        : (envForecastLower.includes('rain') || envForecastLower.includes('shower'))
+          ? '🌧'
+          : (envForecastLower.includes('snow') || envForecastLower.includes('flurr') || envForecastLower.includes('sleet') || envForecastLower.includes('freezing'))
+            ? '🌨'
+            : (envForecastLower.includes('fog') || envForecastLower.includes('mist'))
+              ? '🌫'
+              : (envForecastLower.includes('overcast') || envForecastLower.includes('cloudy'))
+                ? '☁️'
+                : (envForecastLower.includes('clear') || envForecastLower.includes('sunny'))
+                  ? '☀️'
+                  : (Number.isFinite(envPrecip) && envPrecip >= 50)
+                    ? '🌧'
+                    : (Number.isFinite(envPrecip) && envPrecip >= 20)
+                      ? '☁️'
+                      : '🌤';
+    const windCompassHtml = hasWindDirection
+      ? `
+        <div style="width: 74px; min-width: 74px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+          <div style="position: relative; width: 64px; height: 64px; border: 1px solid rgba(255,255,255,0.35); border-radius: 9999px; color: #cbd5e1; font-size: 9px;">
+            <span style="position: absolute; top: 2px; left: 50%; transform: translateX(-50%);">N</span>
+            <span style="position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);">S</span>
+            <span style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%);">W</span>
+            <span style="position: absolute; right: 3px; top: 50%; transform: translateY(-50%);">E</span>
+            <div style="position: absolute; left: 50%; bottom: 50%; width: 2px; height: 25px; background: #22d3ee; border-radius: 9999px; transform-origin: bottom center; transform: translateX(-50%) rotate(${windToDeg}deg);"></div>
+          </div>
+          <div style="font-size: 9px; color: #94a3b8; margin-top: 3px; text-align: center; line-height: 1.2;">Blowing to</div>
+          <div style="font-size: 9px; color: #e2e8f0; text-align: center; line-height: 1.2;">${windToText}</div>
+          <div style="margin-top: 6px; display: flex; flex-direction: column; align-items: center;">
+            <div style="font-size: 20px; line-height: 1;">${weatherIcon}</div>
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 2px; text-align: center; line-height: 1.2; max-width: 70px;">${envForecastText}</div>
+          </div>
+        </div>
+      `
+      : `
+        <div style="width: 74px; min-width: 74px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #94a3b8; text-align: center;">
+          Wind dir N/A
+        </div>
+      `;
+
+    const gaugeDetailsHtml = (activity?.gaugeStage != null || activity?.gaugeFlow != null)
+      ? `
+      <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">
+        ${activity?.gaugeStage != null ? `Stage: <strong>${Number(activity.gaugeStage).toFixed(2)} ${activity?.gaugeStageUnits || 'ft'}</strong>` : 'Stage unavailable'}
+        ${activity?.gaugeFlow != null ? `&middot; Flow: <strong>${Number(activity.gaugeFlow).toFixed(1)} ${activity?.gaugeFlowUnits || 'kcfs'}</strong>` : ''}
+      </div>
+    `
+      : '';
 
     const activityHtml = activity
       ? `
       <div style="border-top: 1px solid #475569; margin-top: 8px; padding-top: 8px;">
-        <div style="font-size: 11px; font-weight: 600; color: #facc15; margin-bottom: 4px;">Current Lock Conditions</div>
-        <div style="font-size: 11px; color: #e2e8f0;">Queue: <strong>${activity.queueCount ?? 'N/A'} tows</strong></div>
-        <div style="font-size: 11px; color: #e2e8f0;">Estimated Wait: <strong>${activity.waitMinutes ?? 'N/A'} min</strong></div>
-        <div style="font-size: 11px; color: #e2e8f0;">Congestion: <strong>${activity.congestionLabel || 'Unavailable'}</strong>${Number.isFinite(activity.congestion) ? ` (${Math.round(activity.congestion)}%)` : ''}</div>
-        <div style="font-size: 11px; color: #e2e8f0;">Last 24h Passages: <strong>${activity.passages24h ?? 'N/A'}</strong></div>
+        <div style="font-size: 11px; font-weight: 600; color: #facc15; margin-bottom: 4px;">River Danger Assessment</div>
+        <div style="font-size: 12px; color: #e2e8f0; margin-bottom: 4px;">
+          Level: <strong style="color: ${activity.dangerColor || '#9ca3af'};">${activity.dangerLevel || 'Unknown'}</strong>
+          ${activity.dangerScore != null ? `&middot; <strong>${activity.dangerScore}/100</strong>` : ''}
+        </div>
+        ${activity.dangerConfidence && activity.dangerConfidence !== 'Unknown'
+          ? `<div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px;">Confidence: ${activity.dangerConfidence}</div>`
+          : ''}
+        ${activity.dangerFactors?.length > 0
+          ? `<div style="font-size: 10px; color: #94a3b8; margin-bottom: 4px;">${activity.dangerFactors.join(' &middot; ')}</div>`
+          : ''}
+        ${gaugeDetailsHtml}
+        ${hasVerifiedTrafficMetrics ? `
+          <div style="font-size: 11px; color: #e2e8f0; margin-top: 4px;">Queue: <strong>${activity.queueCount ?? 'N/A'} tows</strong></div>
+          <div style="font-size: 11px; color: #e2e8f0;">Wait: <strong>${activity.waitMinutes ?? 'N/A'} min</strong></div>
+          <div style="font-size: 11px; color: #e2e8f0;">Last 24h: <strong>${activity.passages24h ?? 'N/A'} passages</strong></div>
+          ${activity.lastPassage ? `<div style="font-size: 10px; color: #94a3b8;">Last passage: ${new Date(activity.lastPassage).toLocaleTimeString()}</div>` : ''}
+          ${activity.direction ? `<div style="font-size: 10px; color: #94a3b8;">Traffic direction: ${activity.direction}</div>` : ''}
+        ` : ''}
+        ${!hasVerifiedTrafficMetrics && activity.estimatedWaitRange
+          ? `<div style="font-size: 11px; color: #e2e8f0; margin-top: 4px;">Est. Wait: <strong>${activity.estimatedWaitRange}</strong> <span style="font-size: 10px; color: #94a3b8;">(model)</span></div>`
+          : ''}
+        <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Source: ${activity.sourceTag === 'EST' ? 'NOAA gauge estimate' : (activity.sourceTag || 'N/A')}</div>
       </div>
     `
       : '';
 
     const envHtml = `
       <div style="border-top: 1px solid #475569; margin-top: 8px; padding-top: 8px;">
-        <div style="font-size: 11px; font-weight: 600; color: #a7f3d0; margin-bottom: 4px;">River + Wind Conditions</div>
-        <div style="font-size: 11px; color: #e2e8f0;">River Level: <strong>${envRiverLevelText}</strong></div>
-        <div style="font-size: 11px; color: #e2e8f0;">Current Conditions: <strong>${envConditionText}</strong></div>
-        <div style="font-size: 11px; color: #e2e8f0;">Wind: <strong>${envWindText}</strong></div>
-        <div style="font-size: 10px; color: #94a3b8;">Weather: ${envForecastText}</div>
+        <div style="font-size: 11px; font-weight: 600; color: #a7f3d0; margin-bottom: 4px;">River Weather</div>
+        <div style="display: flex; gap: 8px; align-items: flex-start; justify-content: space-between;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 11px; color: #e2e8f0;">River Level: <strong>${envRiverLevelText}</strong></div>
+            <div style="font-size: 11px; color: #e2e8f0;">Current Conditions: <strong>${envConditionText}</strong></div>
+            <div style="font-size: 11px; color: #e2e8f0;">Temp: <strong>${envTempText}</strong></div>
+            <div style="font-size: 11px; color: #e2e8f0;">Today: <strong>${envTempRangeText}</strong></div>
+            <div style="font-size: 11px; color: #e2e8f0;">Wind: <strong>${envWindText}</strong> (Gusts <strong>${envGustText}</strong>)</div>
+            <div style="font-size: 10px; color: #94a3b8;">Direction: ${envWindDirText}</div>
+            <div style="font-size: 10px; color: #94a3b8;">Precip Chance: ${envPrecipText}</div>
+            <div style="font-size: 10px; color: #94a3b8;">Forecast: ${envForecastText}</div>
+          </div>
+          ${windCompassHtml}
+        </div>
       </div>
     `;
 
@@ -332,11 +451,9 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         </div>
       `;
     } else { // live
-      const congestionLabel = congestion < 30 ? 'Light' : congestion < 70 ? 'Moderate' : 'Heavy';
-      const directionEmoji = direction === 'upstream' ? '⬆️ Upstream' : direction === 'downstream' ? '⬇️ Downstream' : '↔️ Mixed';
-      
+      const liveActivity = activity || null;
       // Determine badge based on cached status
-      let badgeHTML = '<span style="background: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 9px;">LIVE DATA</span>';
+      let badgeHTML = '<span style="background: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 9px;">VERIFIED STATUS</span>';
       if (cached && ageMinutes !== null) {
         badgeHTML = `<span style="background: #d97706; padding: 2px 6px; border-radius: 4px; font-size: 9px;">LAST VERIFIED ${ageMinutes} MIN AGO</span>`;
       }
@@ -349,18 +466,9 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
           </div>
           <div style="border-bottom: 1px solid #475569; padding-bottom: 8px; margin-bottom: 8px;">
             <div>📍 River Mile: ${riverMile}</div>
-            <div>🚢 Queue: <strong>${queueLength ?? '—'} tows</strong></div>
-          </div>
-          <div style="border-bottom: 1px solid #475569; padding-bottom: 8px; margin-bottom: 8px;">
-            <div>📊 Congestion: <span style="color: ${color}; font-weight: bold;">${congestionLabel}</span> (${(congestion ?? 0).toFixed(0)}%)</div>
-            <div>⏱ Wait: <strong>${waitTime ?? '—'} min</strong> avg</div>
-          </div>
-          <div style="border-bottom: 1px solid #475569; padding-bottom: 8px; margin-bottom: 8px;">
-            <div>📈 Last 24h: <strong>${towsLast24h ?? '—'} passages</strong></div>
-            <div>${directionEmoji} traffic</div>
-          </div>
-          <div style="font-size: 10px; color: #94a3b8;">
-            Last passage: ${lastPassage?.toLocaleTimeString() ?? '—'}
+            ${liveActivity?.dangerLevel && liveActivity.dangerLevel !== 'Unknown'
+              ? `<div style="margin-top: 3px;">⚠️ Danger: <strong style="color: ${liveActivity.dangerColor};">${liveActivity.dangerLevel}</strong>${liveActivity.dangerScore != null ? ` (${liveActivity.dangerScore}/100)` : ''}</div>`
+              : ''}
           </div>
           ${activityHtml}
           ${envHtml}
@@ -598,7 +706,8 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
     prevMapStyleRef.current = mapStyle;
   }, [mapStyle, mapReady]);
 
-  // Add/update lock markers when locks change (should NOT recreate when lockStatusData changes)
+  // Add/update lock markers when lock list changes.
+  // Marker/icon/popup content updates are handled by dedicated effects below.
   useEffect(() => {
     if (!map.current || !window.L || !mapReady) return;
     
@@ -617,7 +726,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
       const isLoading = getInFlightRequest(lock.id, lock.name) !== null;
       const state = isLoading ? 'loading' : 'not_loaded';
 
-      const derivedActivity = lockActivityById[lock.id] || null;
+      const derivedActivity = lockActivityByIdRef.current?.[lock.id] || null;
       const color = derivedActivity?.markerColor || (state === 'loading' ? '#60a5fa' : '#d1d5db');
 
       // Create custom icon with colored background
@@ -629,7 +738,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
       markersByLockIdRef.current[lock.id] = marker;
 
       // Set initial popup content (not_loaded or loading state)
-      const baseActivity = lockActivityById[lock.id] || null;
+      const baseActivity = lockActivityByIdRef.current?.[lock.id] || null;
       const popupContent = createPopupContent(
         lock.name,
         lock.riverMile,
@@ -642,10 +751,17 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         lock.id === selectedLockIdRef.current ? selectedHydroRef.current : null,
         baseActivity,
         {
-          riverLevel: currentRiverLevel,
-          riverConditionLabel,
-          windMph: weatherNow?.windMph,
-          shortForecast: weatherNow?.shortForecast,
+          riverLevel: currentRiverLevelRef.current,
+          riverConditionLabel: riverConditionLabelRef.current,
+          tempF: weatherNowRef.current?.tempF,
+          tempHighF: weatherNowRef.current?.tempHighF,
+          tempLowF: weatherNowRef.current?.tempLowF,
+          windMph: weatherNowRef.current?.windMph,
+          windDeg: weatherNowRef.current?.windDeg,
+          windGustMph: weatherNowRef.current?.windGustMph,
+          windGustHighMph: weatherNowRef.current?.windGustHighMph,
+          precip: weatherNowRef.current?.precip,
+          shortForecast: weatherNowRef.current?.shortForecast,
         }
       );
       marker.bindPopup(popupContent, {
@@ -665,6 +781,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         const statusResult = lockStatusData[lock.id];
         const isLoaded = statusResult !== undefined;
         const isCurrentlyLoading = getInFlightRequest(lock.id, lock.name) !== null;
+        const baseActivity = lockActivityByIdRef.current?.[lock.id] || null;
 
         // Determine what to show in popup right now
         let currentState = 'not_loaded';
@@ -676,8 +793,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         } else if (isLoaded) {
           if (statusResult?.available && statusResult?.data) {
             currentState = 'live';
-            const congestion = statusResult.data.congestion ?? 0;
-            currentColor = getLockActivityVisuals(congestion).markerColor;
+            currentColor = baseActivity?.dangerColor || '#9ca3af';
           } else {
             currentState = 'unavailable';
             currentColor = '#9ca3af';
@@ -685,17 +801,16 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         }
 
         // Set popup content to current state and open it immediately
-        const baseActivity = lockActivityById[lock.id] || null;
         const currentPopupContent = createPopupContent(
           lock.name,
           lock.riverMile,
           currentState,
-          isLoaded ? statusResult?.data?.queueLength ?? null : null,
-          isLoaded ? statusResult?.data?.congestion ?? null : null,
-          isLoaded ? statusResult?.data?.averageWaitTime ?? null : null,
-          isLoaded ? statusResult?.data?.towsLast24h ?? null : null,
-          isLoaded ? statusResult?.data?.direction ?? 'unknown' : null,
-          isLoaded && statusResult?.data?.lastTowPassage ? new Date(statusResult.data.lastTowPassage) : null,
+          null,
+          isLoaded ? statusResult?.data?.congestion ?? baseActivity?.congestion ?? null : baseActivity?.congestion ?? null,
+          null,
+          null,
+          null,
+          null,
           currentColor,
           isLoaded ? statusResult?.cached ?? false : false,
           isLoaded ? statusResult?.ageMinutes ?? null : null,
@@ -703,10 +818,17 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
           lock.id === selectedLockIdRef.current ? selectedHydroRef.current : null,
           baseActivity,
           {
-            riverLevel: currentRiverLevel,
-            riverConditionLabel,
-            windMph: weatherNow?.windMph,
-            shortForecast: weatherNow?.shortForecast,
+            riverLevel: currentRiverLevelRef.current,
+            riverConditionLabel: riverConditionLabelRef.current,
+            tempF: weatherNowRef.current?.tempF,
+            tempHighF: weatherNowRef.current?.tempHighF,
+            tempLowF: weatherNowRef.current?.tempLowF,
+            windMph: weatherNowRef.current?.windMph,
+            windDeg: weatherNowRef.current?.windDeg,
+            windGustMph: weatherNowRef.current?.windGustMph,
+            windGustHighMph: weatherNowRef.current?.windGustHighMph,
+            precip: weatherNowRef.current?.precip,
+            shortForecast: weatherNowRef.current?.shortForecast,
           }
         );
         marker.setPopupContent(currentPopupContent);
@@ -735,20 +857,19 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
           // Determine color for new state
           let newColor = '#9ca3af'; // Default to gray for unavailable
           if (newState === 'live' && result?.data) {
-            const congestion = result.data.congestion ?? 0;
-            newColor = getLockActivityVisuals(congestion).markerColor;
+            newColor = baseActivity?.dangerColor || '#9ca3af';
           }
           
           const newPopupContent = createPopupContent(
             lock.name,
             lock.riverMile,
             newState,
-            result?.data?.queueLength ?? null,
-            result?.data?.congestion ?? null,
-            result?.data?.averageWaitTime ?? null,
-            result?.data?.towsLast24h ?? null,
-            result?.data?.direction ?? 'unknown',
-            result?.data?.lastTowPassage ? new Date(result.data.lastTowPassage) : new Date(),
+            null,
+            result?.data?.congestion ?? baseActivity?.congestion ?? null,
+            null,
+            null,
+            null,
+            null,
             newColor,
             result?.cached ?? false,
             result?.ageMinutes ?? null,
@@ -756,10 +877,17 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
             lock.id === selectedLockIdRef.current ? selectedHydroRef.current : null,
             baseActivity,
             {
-              riverLevel: currentRiverLevel,
-              riverConditionLabel,
-              windMph: weatherNow?.windMph,
-              shortForecast: weatherNow?.shortForecast,
+              riverLevel: currentRiverLevelRef.current,
+              riverConditionLabel: riverConditionLabelRef.current,
+              tempF: weatherNowRef.current?.tempF,
+              tempHighF: weatherNowRef.current?.tempHighF,
+              tempLowF: weatherNowRef.current?.tempLowF,
+              windMph: weatherNowRef.current?.windMph,
+              windDeg: weatherNowRef.current?.windDeg,
+              windGustMph: weatherNowRef.current?.windGustMph,
+              windGustHighMph: weatherNowRef.current?.windGustHighMph,
+              precip: weatherNowRef.current?.precip,
+              shortForecast: weatherNowRef.current?.shortForecast,
             }
           );
           marker.setPopupContent(newPopupContent);
@@ -771,7 +899,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         }
       });
     });
-  }, [locks, lockActivityById, mapReady, refreshTrigger]);
+  }, [locks, mapReady, refreshTrigger]);
 
   // Update lock marker popups when lockStatusData changes (without recreating markers)
   useEffect(() => {
@@ -786,12 +914,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
       const isLoading = !statusResult && getInFlightRequest(lock.id, lock.name) !== null;
       
       let state = 'not_loaded';
-      let queueLength = null;
       let congestion = null;
-      let waitTime = null;
-      let towsLast24h = null;
-      let direction = null;
-      let lastPassage = null;
       let color = '#d1d5db';
 
       if (isLoading) {
@@ -800,14 +923,8 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
       } else if (statusResult) {
         if (statusResult?.available && statusResult?.data) {
           state = 'live';
-          queueLength = statusResult.data.queueLength ?? null;
-          congestion = statusResult.data.congestion ?? null;
-          waitTime = statusResult.data.averageWaitTime ?? null;
-          towsLast24h = statusResult.data.towsLast24h ?? null;
-          direction = statusResult.data.direction ?? 'unknown';
-          lastPassage = statusResult.data.lastTowPassage ? new Date(statusResult.data.lastTowPassage) : new Date();
-          
-          color = getLockActivityVisuals(congestion).markerColor;
+          congestion = statusResult.data.congestion ?? lockActivityById[lock.id]?.congestion ?? null;
+          color = lockActivityById[lock.id]?.dangerColor || '#9ca3af';
         } else {
           state = 'unavailable';
           color = '#9ca3af';
@@ -820,12 +937,12 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         lock.name,
         lock.riverMile,
         state,
-        queueLength,
+        null,
         congestion,
-        waitTime,
-        towsLast24h,
-        direction,
-        lastPassage,
+        null,
+        null,
+        null,
+        null,
         color,
         statusResult?.cached ?? false,
         statusResult?.ageMinutes ?? null,
@@ -835,7 +952,14 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
         {
           riverLevel: currentRiverLevel,
           riverConditionLabel,
+          tempF: weatherNow?.tempF,
+          tempHighF: weatherNow?.tempHighF,
+          tempLowF: weatherNow?.tempLowF,
           windMph: weatherNow?.windMph,
+          windDeg: weatherNow?.windDeg,
+          windGustMph: weatherNow?.windGustMph,
+          windGustHighMph: weatherNow?.windGustHighMph,
+          precip: weatherNow?.precip,
           shortForecast: weatherNow?.shortForecast,
         }
       );
@@ -852,7 +976,7 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
       if (!marker) return;
 
       const activity = lockActivityById[lock.id];
-      const markerColor = activity?.markerColor || '#9ca3af';
+      const markerColor = activity?.dangerColor || activity?.markerColor || '#9ca3af';
       marker.setIcon(buildLockIcon(window.L, markerColor));
     });
   }, [lockActivityById, locks, mapReady]);
@@ -1171,13 +1295,8 @@ export default function OhioRiverActivityMap({ locks = [], lockActivityById = {}
       />
 
       <div className="text-xs text-white/80 bg-slate-900/95 p-2.5 rounded border border-white/10">
-        <p className="font-semibold text-white mb-1.5">
-          Ohio River Activity Map | 🟢 Green: Light traffic (&lt;30% congestion) | 🟡 Yellow: Moderate traffic (30-70% congestion) | 🔴 Red: Heavy traffic (&gt;70% congestion)
-        </p>
-        <p className="text-white/60 text-[10px] border-t border-white/10 pt-1.5">
-          <strong>Data Source:</strong> U.S. Army Corps of Engineers (USACE) Lock Performance Monitoring System. 
-          Real-time data when available; otherwise lock status may be unavailable.
-          Analytics track infrastructure activity, not individual vessels.
+        <p className="text-white/60 text-[10px]">
+          <strong>Data Sources:</strong> Lock status uses USACE CWMS when available. Gauge stage/flow/trend come from NOAA NWPS gauge feeds. Weather inputs come from selected-station forecast/observation data (NWS with Open-Meteo fallback). Danger levels and estimated wait are model outputs for trip planning and are not measured queue telemetry.
         </p>
       </div>
 

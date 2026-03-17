@@ -134,24 +134,12 @@ function buildGaugeTraffic(json, opts) {
     major: opts.major,
   });
 
-  const queueLength = clamp(Math.round(congestion / 18 + (congestion > 72 ? 1 : 0)), 0, 8);
-  const averageWaitTime = clamp(Math.round(6 + congestion * 0.48), 4, 75);
-  const flowLift = latest.flow != null ? clamp(latest.flow / 30, 0, 6) : 0;
-  const towsLast24h = clamp(Math.round(34 - congestion * 0.28 + flowLift), 3, 42);
-
-  const direction = trendPerHour >= 0 ? "upstream" : "downstream";
-  const inferredPassageAgoMin = clamp(Math.round(averageWaitTime * 0.35 + queueLength * 4), 5, 90);
-  const lastTowPassage = new Date(Date.now() - inferredPassageAgoMin * 60000).toISOString();
-
   return {
-    queueLength,
     congestion,
-    averageWaitTime,
-    towsLast24h,
-    direction,
-    lastTowPassage,
-    source: "noaa-arcgis-gauge-derived",
-    realTimeData: true,
+    source: "noaa_hydrology_estimate",
+    realTimeData: observed.length > 0,
+    derivedFromHydrology: true,
+    activityMode: "hydrology_estimate",
     gauge: {
       id: opts.gaugeId,
       stage: latest.stage,

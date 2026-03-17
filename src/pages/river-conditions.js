@@ -6,6 +6,7 @@ import LockDamMap from "@/components/LockDamMap";
 import OhioRiverActivityMap from "@/components/OhioRiverActivityMap";
 import { ohioRiverLocks } from "@/lib/locks";
 import { normalizeLockActivity } from "@/lib/lockActivity";
+import { computeDangerScore, DANGER_LEVELS } from "@/lib/dangerScore";
 import { useUserProfile } from "@/context/UserProfileContext";
 import { useAuth } from "@/context/AuthContext";
 import { updateUserLocation } from "@/lib/userProfile";
@@ -314,13 +315,23 @@ const getWeatherIcon = (shortForecast, precip = 0) => {
   return precip >= 50 ? "🌧" : precip >= 20 ? "☁️" : "🌤";
 };
 
-// Mapping for numeric hazardCode (0–3) coming from API
-const HAZARD_LEVELS = {
-  0: { label: "Normal", color: "#00a86b" },
-  1: { label: "Elevated", color: "#d5a000" },
-  2: { label: "Near Flood", color: "#ff8c00" },
-  3: { label: "Flooding", color: "#c63d0f" },
-};
+// Top-bar danger mapping aligned with the shared 0-100 danger algorithm.
+const TOP_BAR_DANGER_LEVELS = DANGER_LEVELS
+  .filter((entry) => entry.level !== "Unknown")
+  .map((entry, code) => ({
+    code,
+    label: entry.level,
+    color: entry.color,
+  }));
+
+function scoreToDangerCode(score) {
+  if (!Number.isFinite(score)) return 0;
+  if (score < 20) return 0; // Low
+  if (score < 40) return 1; // Guarded
+  if (score < 60) return 2; // Elevated
+  if (score < 80) return 3; // High
+  return 4; // Severe
+}
 
 const AQI_GRADIENT =
   "linear-gradient(to right, #3A6F3A, #9A8B2E, #A66B2C, #8B3A46, #613A8B, #7A2A3A)";
@@ -490,28 +501,24 @@ function Chart({
 }
 
 /* ---------------------------------------------------
-   HAZARD BAR (0–3 like your AQI bar, with marker)
+   DANGER BAR (0-4 like your AQI bar, with marker)
 --------------------------------------------------- */
 function RiverHazardBar({ hazardCode }) {
+  const maxCode = TOP_BAR_DANGER_LEVELS.length - 1;
   const code =
-    typeof hazardCode === "number" && hazardCode >= 0 && hazardCode <= 3
+    typeof hazardCode === "number" && hazardCode >= 0 && hazardCode <= maxCode
       ? hazardCode
       : 0;
 
-  const stops = [
-    { code: 0, label: "Normal", color: HAZARD_LEVELS[0].color },
-    { code: 1, label: "Elevated", color: HAZARD_LEVELS[1].color },
-    { code: 2, label: "Near Flood", color: HAZARD_LEVELS[2].color },
-    { code: 3, label: "Flooding", color: HAZARD_LEVELS[3].color },
-  ];
+  const stops = TOP_BAR_DANGER_LEVELS;
 
-  const pct = (code / 3) * 100;
+  const pct = maxCode > 0 ? (code / maxCode) * 100 : 0;
 
   return (
     <div className="w-full px-4 pt-3">
       <div className="flex items-center justify-between text-[10px] text-white/70 mb-1">
         <span className="font-semibold text-white/80">River Danger Level</span>
-        <span>{HAZARD_LEVELS[code]?.label ?? "Normal"}</span>
+        <span>{stops[code]?.label ?? "Low"}</span>
       </div>
 
       <div className="relative h-2 w-full overflow-hidden rounded-full border border-white/20">
@@ -575,13 +582,14 @@ function RiverLevelIndicator({ history, hazardCode }) {
     }
   }
 
+  const maxCode = TOP_BAR_DANGER_LEVELS.length - 1;
   const safeCode =
-    typeof hazardCode === "number" && hazardCode >= 0 && hazardCode <= 3
+    typeof hazardCode === "number" && hazardCode >= 0 && hazardCode <= maxCode
       ? hazardCode
       : 0;
 
-  const label = HAZARD_LEVELS[safeCode]?.label || "Normal";
-  const codeColor = HAZARD_LEVELS[safeCode]?.color || "#ffffff";
+  const label = TOP_BAR_DANGER_LEVELS[safeCode]?.label || "Low";
+  const codeColor = TOP_BAR_DANGER_LEVELS[safeCode]?.color || "#ffffff";
 
   return (
     <div className="flex flex-col gap-1 text-xs mt-2">
@@ -817,6 +825,7 @@ export default function RiverConditions() {
   const [selectedDam, setSelectedDam] = useState(null);
   const [mapLocks, setMapLocks] = useState(ohioRiverLocks);
   const [lockActivityById, setLockActivityById] = useState({});
+  const [lockRawMetrics, setLockRawMetrics] = useState({});
   const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const [data, setData] = useState(null);
@@ -876,64 +885,81 @@ export default function RiverConditions() {
     };
   }, []);
 
+  // --- Step 1: Fetch raw gauge metrics for each lock (re-runs when lock list changes) ---
   useEffect(() => {
     let cancelled = false;
 
-    async function loadLockActivity() {
+    async function loadLockMetrics() {
       if (!Array.isArray(mapLocks) || mapLocks.length === 0) return;
 
       const entries = await Promise.all(
         mapLocks.map(async (lock) => {
           const gaugeId = lock?.arcgisGaugeId || lock?.floodStages?.gaugeId;
-          if (!gaugeId) {
-            return [lock.id, normalizeLockActivity(lock, null)];
-          }
+          if (!gaugeId) return [lock.id, { lock, metrics: null }];
 
           try {
             const params = new URLSearchParams({
               gaugeId: String(gaugeId).toUpperCase(),
             });
 
-            if (lock?.floodStages?.action != null) params.set("action", String(lock.floodStages.action));
-            if (lock?.floodStages?.minor != null) params.set("minor", String(lock.floodStages.minor));
-            if (lock?.floodStages?.moderate != null) params.set("moderate", String(lock.floodStages.moderate));
-            if (lock?.floodStages?.major != null) params.set("major", String(lock.floodStages.major));
-            if (lock?.arcgisStatus) params.set("status", String(lock.arcgisStatus));
+            if (lock?.floodStages?.action != null)    params.set("action",   String(lock.floodStages.action));
+            if (lock?.floodStages?.minor != null)     params.set("minor",    String(lock.floodStages.minor));
+            if (lock?.floodStages?.moderate != null)  params.set("moderate", String(lock.floodStages.moderate));
+            if (lock?.floodStages?.major != null)     params.set("major",    String(lock.floodStages.major));
+            if (lock?.arcgisStatus)                   params.set("status",   String(lock.arcgisStatus));
 
             const response = await fetch(`/api/gauge-traffic?${params.toString()}`);
-            if (!response.ok) {
-              return [lock.id, normalizeLockActivity(lock, null)];
-            }
+            if (!response.ok) return [lock.id, { lock, metrics: null }];
 
             const payload = await response.json();
-            if (!payload?.available || !payload?.data) {
-              return [lock.id, normalizeLockActivity(lock, null)];
-            }
+            if (!payload?.available || !payload?.data) return [lock.id, { lock, metrics: null }];
 
             const metrics = {
               ...payload.data,
+              derivedFromHydrology: payload.data.derivedFromHydrology !== false,
+              activityMode: payload.data.activityMode || "hydrology_estimate",
               gaugeDerived: true,
-              realTimeData: true,
+              realTimeData: !!payload.data.realTimeData,
             };
-            return [lock.id, normalizeLockActivity(lock, metrics)];
+            return [lock.id, { lock, metrics }];
           } catch {
-            return [lock.id, normalizeLockActivity(lock, null)];
+            return [lock.id, { lock, metrics: null }];
           }
         })
       );
 
       if (cancelled) return;
-      setLockActivityById(Object.fromEntries(entries));
+      setLockRawMetrics(Object.fromEntries(entries));
     }
 
-    loadLockActivity();
+    loadLockMetrics();
 
-    const refreshInterval = setInterval(loadLockActivity, 300000);
+    const refreshInterval = setInterval(loadLockMetrics, 300000);
     return () => {
       cancelled = true;
       clearInterval(refreshInterval);
     };
   }, [mapLocks]);
+
+  // --- Step 2: Re-normalize with current weather whenever gauge data or weather changes ---
+  useEffect(() => {
+    if (Object.keys(lockRawMetrics).length === 0) return;
+
+    const env = weather
+      ? {
+          windMph:       weather.windMph       ?? null,
+          windDeg:       weather.windDeg       ?? null,
+          shortForecast: weather.shortForecast ?? null,
+          precip:        weather.precip        ?? null,
+        }
+      : null;
+
+    const entries = Object.entries(lockRawMetrics).map(([id, { lock, metrics }]) => [
+      id,
+      normalizeLockActivity(lock, metrics, env),
+    ]);
+    setLockActivityById(Object.fromEntries(entries));
+  }, [lockRawMetrics, weather]);
 
   /* -------------------- HELPER: Find matching station for a dam -------------------- */
   // When a lock/dam is clicked, find the best matching station
@@ -1762,45 +1788,62 @@ export default function RiverConditions() {
   }, [data?.observed, hasFloodStage, displayFloodStage, weather?.windMph, weather?.windGustHighMph, weather?.windGustMph, weather?.precip, weather?.shortForecast]);
 
   const hazardCode = useMemo(() => {
-    let score = 0;
+    const observedStage = Number(data?.observed);
+    const windMph = Number(weather?.windMph);
+    const precip = Number(weather?.precip);
 
+    const rawFlow = Number(
+      data?.flowNow ?? data?.flow ?? data?.flowValue ?? data?.discharge ?? data?.flowCfs
+    );
+    const flowKcfs = Number.isFinite(rawFlow)
+      ? rawFlow > 2000
+        ? rawFlow / 1000
+        : rawFlow
+      : null;
+
+    let trendPerHour = null;
+    if (Array.isArray(data?.history) && data.history.length >= 2) {
+      const clean = data.history
+        .map((p) => ({ t: new Date(p?.t).getTime(), v: Number(p?.v) }))
+        .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v))
+        .sort((a, b) => a.t - b.t);
+
+      if (clean.length >= 2) {
+        const latest = clean[clean.length - 1];
+        const prior = clean[clean.length - 2];
+        const hours = (latest.t - prior.t) / (1000 * 60 * 60);
+        if (Number.isFinite(hours) && hours > 0) {
+          trendPerHour = (latest.v - prior.v) / hours;
+        }
+      }
+    }
+
+    const danger = computeDangerScore({
+      stage: Number.isFinite(observedStage) ? observedStage : null,
+      flow: Number.isFinite(flowKcfs) ? flowKcfs : null,
+      trendPerHour,
+      floodStages: selectedDam?.floodStages ?? null,
+      windMph: Number.isFinite(windMph) ? windMph : null,
+      shortForecast: weather?.shortForecast ?? "",
+      precip: Number.isFinite(precip) ? precip : null,
+    });
+
+    if (danger?.score != null) return scoreToDangerCode(danger.score);
+
+    // Backward fallback if top-bar inputs are insufficient.
     const apiHazard =
       typeof data?.hazardCode === "number" && data.hazardCode >= 0 && data.hazardCode <= 3
         ? data.hazardCode
         : 0;
-
-    const observed = Number(data?.observed);
-    if (hasFloodStage && Number.isFinite(observed)) {
-      const ratio = observed / displayFloodStage;
-      if (ratio >= 1.0) score = Math.max(score, 3);
-      else if (ratio >= 0.9) score = Math.max(score, 2);
-      else if (ratio >= 0.75) score = Math.max(score, 1);
-    }
-
-    const windMph = Number(weather?.windMph || 0);
-    const gustMph = Number(weather?.windGustHighMph || weather?.windGustMph || 0);
-    if (gustMph >= 38 || windMph >= 30) score += 1.2;
-    else if (gustMph >= 30 || windMph >= 24) score += 0.9;
-    else if (gustMph >= 22 || windMph >= 18) score += 0.45;
-
-    const precipChance = Number(weather?.precip || 0);
-    if (precipChance >= 80) score += 0.9;
-    else if (precipChance >= 60) score += 0.55;
-    else if (precipChance >= 40) score += 0.25;
-
-    const forecastText = String(weather?.shortForecast || "").toLowerCase();
-    if (/thunder|storm|torrential|heavy rain|flash/.test(forecastText)) score += 1.1;
-    else if (/rain|showers|snow|sleet/.test(forecastText)) score += 0.35;
-
-    const combined = Math.max(apiHazard, score);
-    return Math.max(0, Math.min(3, Math.round(combined)));
-  }, [data?.hazardCode, data?.observed, hasFloodStage, displayFloodStage, weather?.windMph, weather?.windGustHighMph, weather?.windGustMph, weather?.precip, weather?.shortForecast]);
+    if (apiHazard === 3) return 4;
+    if (apiHazard === 2) return 3;
+    if (apiHazard === 1) return 2;
+    return 0;
+  }, [data?.hazardCode, data?.observed, data?.flowNow, data?.flow, data?.flowValue, data?.discharge, data?.flowCfs, data?.history, selectedDam?.floodStages, weather?.windMph, weather?.precip, weather?.shortForecast]);
 
   const hazardLabel = useMemo(() => 
-    typeof data?.hazardLabel === "string" && data.hazardLabel.trim()
-      ? data.hazardLabel.trim()
-      : HAZARD_LEVELS[hazardCode]?.label ?? "Normal",
-    [data?.hazardLabel, hazardCode]
+    TOP_BAR_DANGER_LEVELS[hazardCode]?.label ?? "Low",
+    [hazardCode]
   );
 
   const precip = useMemo(() => weather?.precip ?? 0, [weather?.precip]);
