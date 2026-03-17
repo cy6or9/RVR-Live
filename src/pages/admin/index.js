@@ -39,35 +39,54 @@ export default function AdminUserPrivilegesPage() {
   } = useQuery({
     queryKey: ["/api/admin/users"],
     queryFn: async () => {
+      // Get the user's ID token for server-side authorization
+      let idToken = null;
+      if (window.firebase && window.firebase.auth && window.firebase.auth.currentUser) {
+        try {
+          idToken = await window.firebase.auth.currentUser.getIdToken(true);
+        } catch (tokenError) {
+          console.error("[Admin] Failed to get ID token:", tokenError.message);
+        }
+      }
+
       try {
-        // Try server-side API first
+        // Try server-side API with Authorization header
         console.log("[Admin] Fetching from server API...");
-        const response = await fetch("/api/admin/users");
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        if (idToken) {
+          headers["Authorization"] = `Bearer ${idToken}`;
+        }
+
+        const response = await fetch("/api/admin/users", { headers });
         if (response.ok) {
           const data = await response.json();
-          console.log("[Admin] Server API returned:", data.length, "users");
-          console.log("[Admin] Sample user:", data[0]);
-          // If we got data, return it
-          if (data && data.length > 0) {
+          const userList = data.users || data; // Handle both formats
+          console.log("[Admin] Server API returned:", userList.length, "users");
+          if (userList.length > 0) {
+            console.log("[Admin] Sample user:", userList[0]);
             setUsingFallback(false);
-            return data;
+            return userList;
           }
         } else {
           console.log("[Admin] Server API failed with status:", response.status);
+          const errorText = await response.text();
+          console.log("[Admin] Error response:", errorText);
         }
       } catch (err) {
         console.log("[Admin] Server API error, using client SDK:", err);
       }
-      
+
       // Fallback to client SDK if server fails or returns empty
       console.log("[Admin] Using client SDK fallback to fetch users");
       setUsingFallback(true);
       const usersRef = collection(firestore, "userProfiles");
       const snapshot = await getDocs(usersRef);
-      
+
       const users = snapshot.docs.map((doc) => {
         const data = doc.data();
-        
+
         // Convert Firestore Timestamps to ISO strings
         const convertTimestamp = (timestamp) => {
           if (!timestamp) return null;
@@ -112,9 +131,10 @@ export default function AdminUserPrivilegesPage() {
                 updatedAt: convertTimestamp(data.lastLocation.updatedAt),
               }
             : null,
+          profileMissing: data.profileMissing || false,
         };
       });
-      
+
       console.log("[Admin] Fetched", users.length, "users from client SDK");
       return users;
     },
@@ -393,9 +413,16 @@ export default function AdminUserPrivilegesPage() {
                             {user.email}
                           </p>
                         </div>
-                        <Badge variant={getTierBadgeVariant(user.privileges?.tier)}>
-                          {user.privileges?.tier || "Basic"}
-                        </Badge>
+                        <div className="flex gap-2">
+                          <Badge variant={getTierBadgeVariant(user.privileges?.tier)}>
+                            {user.privileges?.tier || "Basic"}
+                          </Badge>
+                          {user.profileMissing && (
+                            <Badge variant="destructive" className="bg-orange-600 hover:bg-orange-700">
+                              Profile Missing
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
                       {/* Last Login */}
