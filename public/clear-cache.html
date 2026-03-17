@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Cache</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: #2a2a2a;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        button {
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            background: #06b6d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0.5rem;
+        }
+        button:hover {
+            background: #0891b2;
+        }
+        .success {
+            color: #10b981;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Clear River Valley Report Cache</h1>
+        <p>Click the button below to clear all cached location data.</p>
+        <button onclick="clearCache()">Clear Cache</button>
+        <button onclick="goHome()">Go to River Conditions</button>
+        <div id="message"></div>
+    </div>
+    
+    <script>
+        function clearCache() {
+            localStorage.removeItem('cachedUserLocation');
+            localStorage.clear();
+            document.getElementById('message').innerHTML = '<p class="success">✓ Cache cleared successfully!</p>';
+            console.log('Cache cleared');
+        }
+        
+        function goHome() {
+            window.location.href = '/river-conditions';
+        }
+    </script>
+</body>
+</html>
