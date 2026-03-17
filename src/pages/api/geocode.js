@@ -109,7 +109,7 @@ export default async function handler(req, res) {
     const response = await fetch(geocodeUrl, {
       signal: ctrl.signal,
       headers: {
-        "User-Agent": "RiverValleyReport/1.0 (GitHub @cy6or9/RVRBETA)",
+        "User-Agent": "RiverValleyReport/1.0 (GitHub @cy6or9/RVR-Live)",
         "Accept": "application/json",
       },
     });
@@ -184,7 +184,7 @@ export default async function handler(req, res) {
         const coordSearchResponse = await fetch(coordSearchUrl, {
           signal: coordCtrl.signal,
           headers: {
-            "User-Agent": "RiverValleyReport/1.0 (GitHub @cy6or9/RVRBETA)",
+            "User-Agent": "RiverValleyReport/1.0 (GitHub @cy6or9/RVR-Live)",
             "Accept": "application/json",
           },
         });
@@ -251,7 +251,7 @@ export default async function handler(req, res) {
         const countySearchResponse = await fetch(countySearchUrl, {
           signal: countyCtrl.signal,
           headers: {
-            "User-Agent": "RiverValleyReport/1.0 (GitHub @cy6or9/RVRBETA)",
+            "User-Agent": "RiverValleyReport/1.0 (GitHub @cy6or9/RVR-Live)",
             "Accept": "application/json",
           },
         });

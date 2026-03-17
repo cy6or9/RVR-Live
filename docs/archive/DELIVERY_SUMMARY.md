@@ -233,7 +233,7 @@ A **complete, production-ready user profile system** with everything below imple
 ## ✅ Files Created - Full List
 
 ```
-/workspaces/RVRBETA/
+/workspaces/RVR-Live/
 ├── ARCHITECTURE.md                          (14 KB) ⭐
 ├── DEPLOYMENT_CHECKLIST.md                  (7.6 KB)
 ├── FIREBASE_SETUP.md                        (7.7 KB) ⭐

@@ -12,7 +12,7 @@ City township icons are not appearing on the map even though the code is in plac
 ## Required Fixes
 
 ### Fix 1: Update the selectedLockId handler to work with cities
-**File**: `/workspaces/RVRBETA/src/components/OhioRiverActivityMap.jsx`
+**File**: `/workspaces/RVR-Live/src/components/OhioRiverActivityMap.jsx`
 **Lines**: ~600-620 (the zoom to selected lock useEffect)
 
 **Replace this section**:
@@ -73,7 +73,7 @@ City township icons are not appearing on the map even though the code is in plac
 ```
 
 ### Fix 2: Improve city markers logging and error handling
-**File**: `/workspaces/RVRBETA/src/components/OhioRiverActivityMap.jsx`
+**File**: `/workspaces/RVR-Live/src/components/OhioRiverActivityMap.jsx`
 **Lines**: ~485-510 (city markers useEffect start)
 
 Replace the early return section with better debugging:

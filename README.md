@@ -1,6 +1,6 @@
 # River Valley Report — Next.js Merge
 
-This is a merged Next.js project that combines the **RVRBETA** frontend and the **rvr-backend**
+This is a merged Next.js project that combines the **RVR-Live** frontend and the **rvr-backend**
 USGS / OpenWeather logic into a single app.
 
 ## Scripts

@@ -1,4 +1,4 @@
-# Firebase Fixes Applied - RVRBETA
+# Firebase Fixes Applied - RVR-Live
 
 ## Issues Fixed
 
